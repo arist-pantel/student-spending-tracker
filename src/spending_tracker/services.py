@@ -6,23 +6,43 @@ from spending_tracker.database import (
 from spending_tracker.validation import parse_amount, parse_date
 
 
-def list_expense_categories(database_path=DEFAULT_DATABASE_PATH):
+def validate_transaction_type(transaction_type):
+    """Only income and expense are valid transaction types."""
+    if transaction_type not in ("income", "expense"):
+        raise ValueError("Transaction type must be income or expense.")
+
+
+def list_categories(
+    transaction_type,
+    database_path=DEFAULT_DATABASE_PATH,
+):
+    validate_transaction_type(transaction_type)
+
     connection = get_connection(database_path)
 
     try:
-        return repositories.get_expense_categories(connection)
+        return repositories.get_categories(
+            connection, transaction_type
+        )
     finally:
         connection.close()
 
 
-def add_expense(
+def list_expense_categories(database_path=DEFAULT_DATABASE_PATH):
+    return list_categories("expense", database_path)
+
+
+def add_transaction(
     amount_text,
     date_text,
     category_id,
+    transaction_type,
     note="",
     database_path=DEFAULT_DATABASE_PATH,
 ):
-    """Validate and save an expense, returning its ID."""
+    """Validate and save an income or expense transaction."""
+    validate_transaction_type(transaction_type)
+
     amount_pence = parse_amount(amount_text)
     transaction_date = parse_date(date_text)
 
@@ -34,7 +54,6 @@ def add_expense(
     connection = get_connection(database_path)
 
     try:
-        # Commit on success; roll back if an exception occurs.
         with connection:
             category = repositories.get_category(
                 connection, category_id
@@ -43,8 +62,11 @@ def add_expense(
             if category is None:
                 raise ValueError("That category does not exist.")
 
-            if category["transaction_type"] != "expense":
-                raise ValueError("Choose an expense category.")
+            if category["transaction_type"] != transaction_type:
+                if transaction_type == "expense":
+                    raise ValueError("Choose an expense category.")
+
+                raise ValueError("Choose an income category.")
 
             transaction_id = repositories.insert_transaction(
                 connection,
@@ -58,6 +80,42 @@ def add_expense(
 
     finally:
         connection.close()
+
+
+def add_expense(
+    amount_text,
+    date_text,
+    category_id,
+    note="",
+    database_path=DEFAULT_DATABASE_PATH,
+):
+    """Save an expense using the shared transaction function."""
+    return add_transaction(
+        amount_text,
+        date_text,
+        category_id,
+        transaction_type="expense",
+        note=note,
+        database_path=database_path,
+    )
+
+
+def add_income(
+    amount_text,
+    date_text,
+    category_id,
+    note="",
+    database_path=DEFAULT_DATABASE_PATH,
+):
+    """Save income using the shared transaction function."""
+    return add_transaction(
+        amount_text,
+        date_text,
+        category_id,
+        transaction_type="income",
+        note=note,
+        database_path=database_path,
+    )
 
 
 def list_transactions(database_path=DEFAULT_DATABASE_PATH):

@@ -4,14 +4,15 @@ from spending_tracker import services
 from spending_tracker.validation import format_money
 
 
-def add_expense_screen():
-    categories = services.list_expense_categories()
+def add_transaction_screen(transaction_type):
+    """Collect and save either an expense or income."""
+    categories = services.list_categories(transaction_type)
 
     if not categories:
-        print("No expense categories are available.")
+        print(f"No {transaction_type} categories are available.")
         return
 
-    print("\nExpense categories")
+    print(f"\n{transaction_type.capitalize()} categories")
 
     for category in categories:
         print(f"{category['id']}. {category['name']}")
@@ -26,26 +27,53 @@ def add_expense_screen():
     try:
         category_id = int(category_text)
     except ValueError:
-        raise ValueError("Category ID must be a whole number.") from None
+        raise ValueError(
+            "Category ID must be a whole number."
+        ) from None
+
+    # Check that the chosen ID belongs to a displayed category.
+    selected_category = None
+
+    for category in categories:
+        if category["id"] == category_id:
+            selected_category = category
+            break
+
+    if selected_category is None:
+        raise ValueError("Choose one of the displayed category IDs.")
 
     amount_text = input("Amount in GBP, for example 12.50: ")
     date_text = input("Date as YYYY-MM-DD: ")
     note = input("Note (optional): ")
 
-    confirmation = input("Save this expense? [y/N]: ").strip().lower()
+    print(f"\nType: {transaction_type}")
+    print(f"Category: {selected_category['name']}")
+    print(f"Amount entered: {amount_text}")
+    print(f"Date entered: {date_text}")
+
+    if note.strip():
+        print(f"Note: {note.strip()}")
+
+    confirmation = input(
+        "Save this transaction? [y/N]: "
+    ).strip().lower()
 
     if confirmation != "y":
         print("Cancelled.")
         return
 
-    transaction_id = services.add_expense(
+    transaction_id = services.add_transaction(
         amount_text,
         date_text,
         category_id,
+        transaction_type,
         note,
     )
 
-    print(f"Expense saved with ID {transaction_id}.")
+    print(
+        f"{transaction_type.capitalize()} saved "
+        f"with ID {transaction_id}."
+    )
 
 
 def view_transactions_screen():
@@ -77,26 +105,36 @@ def run():
         print("\nStudent Spending Tracker")
         print("1. Add expense")
         print("2. View transactions")
+        print("3. Add income")
         print("0. Exit")
 
         try:
             choice = input("Choose an option: ").strip()
 
             if choice == "1":
-                add_expense_screen()
+                add_transaction_screen("expense")
+
             elif choice == "2":
                 view_transactions_screen()
+
+            elif choice == "3":
+                add_transaction_screen("income")
+
             elif choice == "0":
                 print("Goodbye.")
                 return
+
             else:
-                print("Choose 1, 2, or 0.")
+                print("Choose 1, 2, 3, or 0.")
 
         except ValueError as error:
             print(f"Invalid input: {error}")
 
         except (sqlite3.Error, OSError):
-            print("Could not access or save the data. Please try again.")
+            print(
+                "Could not access or save the data. "
+                "Please try again."
+            )
 
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye.")

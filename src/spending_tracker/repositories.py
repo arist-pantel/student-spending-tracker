@@ -1,14 +1,19 @@
-def get_expense_categories(connection):
-    """Return expense categories in alphabetical order."""
+def get_categories(connection, transaction_type):
+    """Return categories belonging to the requested type."""
     return connection.execute(
         """
         SELECT id, name
         FROM categories
-        WHERE transaction_type = 'expense'
+        WHERE transaction_type = ?
         ORDER BY name;
-        """
+        """,
+        (transaction_type,),
     ).fetchall()
 
+
+def get_expense_categories(connection):
+    """Return expense categories."""
+    return get_categories(connection, "expense")
 
 def get_category(connection, category_id):
     """Return one category, or None if it does not exist."""
